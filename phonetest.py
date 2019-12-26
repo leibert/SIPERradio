@@ -15,7 +15,7 @@ from datetime import timedelta
 from select import select
 import re
 from threading import Thread
-import eventQueue
+import queue
 
 
 
@@ -26,7 +26,7 @@ class Linphone(Thread):
     def __init__(self, queue):
         Thread.__init__(self)
         subprocess.call(['killall', '-9', 'linphonec'])
-        self.pipe = subprocess.Popen(["linphonec", "-c", "/home/pi/.linphonerc"],
+        self.pipe = subprocess.Popen("/home/pi/linphone-desktop/OUTPUT/no-ui/bin/linphonec",
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.queue = queue
         self.daemon = True
@@ -42,7 +42,7 @@ class Linphone(Thread):
         self.pipe.stdin.write("terminate\n")
 
     def call(self, number):
-        self.pipe.stdin.write("call sip:%s@fritz.fonwlan.box\n" % number)
+        self.pipe.stdin.write("call sip:%s@voip.linode.org\n" % number)
 
     def run(self):
         while 1:
@@ -53,8 +53,8 @@ class Linphone(Thread):
                 self.pipe.close
                 self.pipe = subprocess.Popen("linphonec",
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            line = status[0][0].readline()
-            # print(line)
+            line = status[0][0].readline().decode('utf-8')
+            print(line)
             m = re.search('Receiving new incoming call from (.*),', line)
             if m:
                 self.queue.put(['incoming', m.group(1)])
@@ -85,18 +85,18 @@ def processDTMFCommand(commandString):
     return True
 
 
-linphonec=subprocess.Popen("/home/pi/linphone-desktop/OUTPUT/no-ui/bin/linphonec",
-    stdin=subprocess.PIPE,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    universal_newlines=True) #this is for text communication
-#linphonec.stdin.write("proxy list\n")
+# linphonec=subprocess.Popen("/home/pi/linphone-desktop/OUTPUT/no-ui/bin/linphonec",
+#     stdin=subprocess.PIPE,
+#     stdout=subprocess.PIPE,
+#     stderr=subprocess.PIPE,
+#     universal_newlines=True) #this is for text communication
+# #linphonec.stdin.write("proxy list\n")
 
 
-# multimon_ng = subprocess.Popen("sudo rtl_fm -f 173.240M -M fm -s 22050 -p 37 -E dc -F 0 -g 40 | multimon-ng -a POCSAG1200 -f alpha -t raw -",
-multimon_ng = subprocess.Popen("sox -t wav /home/pi/sources/SIPERradio/dtmftones.wav -esigned-integer -b16 -r 22050 -t raw - | multimon-ng -a DTMF -",
-    stdout=subprocess.PIPE,
-    shell=True)
+# # multimon_ng = subprocess.Popen("sudo rtl_fm -f 173.240M -M fm -s 22050 -p 37 -E dc -F 0 -g 40 | multimon-ng -a POCSAG1200 -f alpha -t raw -",
+# multimon_ng = subprocess.Popen("sox -t wav /home/pi/sources/SIPERradio/dtmftones.wav -esigned-integer -b16 -r 22050 -t raw - | multimon-ng -a DTMF -",
+#     stdout=subprocess.PIPE,
+#     shell=True)
 
 #how long radio user has to enter a valid dtmf code
 dialTimeout=30
@@ -109,8 +109,8 @@ dialString=""
 
 
 
-eventQueue = Queue.Queue()
-linphone = linphone.Linphone(eventQueue)
+eventQueue = queue.Queue()
+linphone = Linphone(eventQueue)
 linphone.start()
 
 
@@ -127,45 +127,10 @@ try:
         # linphoneOutput=linphonec.stdout.readline()
         # print(linphoneOutput)
 
-
-        print("MULTIMON OUTPUT")
-        line = multimon_ng.stdout.readline().decode("utf-8")
-        
-        if (time.time()-timeoutClock > dialTimeout):
-            timeoutClock=time.time()
-            dialString=""
-            continue
-
-        #multimon found a valid DTMF code
-        if line.startswith('DTMF: '):
-            #extract the DTMF tone
-            DTMFvalue = line.split('DTMF: ')[1]
-            print(f"DTMF ID FOUND{DTMFvalue}")
-            #reset the timeout clock
-            timeoutClock=time.time()
-
-            #end of dial command
-            if DTMFvalue == "#":
-                processDTMFCommand(dialString)
-                dialString=""
-            
-            #more than 6 tones have been entered
-            elif len(dialString) > 6:
-                processDTMFCommand(dialString)
-                dialString=""
-
-            #otherwise just append this tone to the running string
-            else:
-                dialString=dialString+DTMFvalue
-
-
-
-
-    
-
-
-        multimon_ng.poll()
-        # print(line)
+        if eventQueue:
+            print("item in queue")
+            event=eventQueue.get()
+            print(event)
         
 
 except KeyboardInterrupt:

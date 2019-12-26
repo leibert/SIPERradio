@@ -74,7 +74,11 @@ logpath = "/var/ramtmp"
 multimon_ng = None
 
 
-test_source='sox -t wav /home/pi/sources/SIPERradio/dtmftones.wav -esigned-integer -b16 -r 22050 -t raw'
+# test_source='sox -t wav /home/pi/sources/SIPERradio/dtmftones.wav -esigned-integer -b16 -r 22050 -t raw'
+# test_source='paplay /home/pi/sources/SIPERradio/dtmftones.wav'
+test_source='sox -t wav /home/pi/sources/SIPERradio/dtmftones.wav -esigned-integer -b16 -r 22050 -t raw pocsag_short.raw'
+
+
 
 proc_src = subprocess.Popen(test_source.split(),
 	stdout=subprocess.PIPE)
